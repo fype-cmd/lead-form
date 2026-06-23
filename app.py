@@ -5,103 +5,140 @@ import requests
 import streamlit as st
 
 # ============================================================
-# CONFIGURAÇÃO
-# - WEBHOOK_URL: defina nos Secrets do Streamlit Cloud (n8n).
-# - IMAGEM_CAPA: URL da imagem da capa (ou deixe vazio p/ placeholder).
+# CONFIGURAÇÃO (Secrets do Streamlit Cloud)
+# - WEBHOOK_URL: endpoint do n8n.
+# - IMAGEM_CAPA: URL da imagem da capa (ou vazio p/ placeholder).
 # - LINK_AGENDAMENTO: URL do Calendly/agenda (botão final).
 # ============================================================
 WEBHOOK_URL = st.secrets.get("WEBHOOK_URL", "")
-IMAGEM_CAPA = st.secrets.get("IMAGEM_CAPA", "")  # ex.: link de uma imagem .jpg/.png
-LINK_AGENDAMENTO = st.secrets.get("LINK_AGENDAMENTO", "")  # ex.: https://calendly.com/...
+IMAGEM_CAPA = st.secrets.get("IMAGEM_CAPA", "")
+LINK_AGENDAMENTO = st.secrets.get("LINK_AGENDAMENTO", "")
 
 st.set_page_config(page_title="Tráfego pago p/ distribuidoras", page_icon="📦", layout="centered")
 
 # ------------------------------------------------------------
-# Estilo estilo Typeform (tema claro)
+# Estilo (Typeform-like, tema claro)
 # ------------------------------------------------------------
 st.markdown(
     """
     <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+      html, body, [class*="css"], input, textarea, button, p, div, span, h1, h2, h3 {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+      }
+
       #MainMenu, header, footer {visibility: hidden;}
       .stDeployButton {display: none;}
       .stApp {background: #ffffff;}
-      .block-container {padding-top: 4rem; padding-bottom: 4rem; max-width: 720px;}
+      .block-container {padding-top: 6vh; padding-bottom: 4rem; max-width: 680px;}
 
-      /* Numero do passo */
-      .passo-num {color:#2f6fed; font-weight:600; font-size:0.95rem; margin-bottom:8px;}
+      /* Animação de entrada a cada tela (sensação de transição) */
+      @keyframes surge {
+        from {opacity: 0; transform: translateY(14px);}
+        to   {opacity: 1; transform: translateY(0);}
+      }
+      .block-container {animation: surge .38s cubic-bezier(.21,.61,.35,1);}
 
       /* Pergunta e ajuda */
-      .pergunta {font-size: 1.9rem; font-weight: 600; line-height: 1.3; color:#243044; margin-bottom:6px;}
-      .ajuda {font-size: 1rem; color:#9aa3af; margin-bottom: 26px;}
+      .pergunta {
+        font-size: 2rem; font-weight: 600; line-height: 1.32;
+        color: #1f2a3a; margin-bottom: 8px; letter-spacing: -.01em;
+      }
+      .ajuda {font-size: 1.02rem; color: #9aa3af; margin-bottom: 30px; line-height: 1.5;}
 
       /* Inputs: linha azul, placeholder azul claro */
       input, textarea {
         background: transparent !important;
-        color: #243044 !important;
-        font-size: 1.4rem !important;
+        color: #1f2a3a !important;
+        font-size: 1.5rem !important;
         border: none !important;
-        border-bottom: 1.5px solid #2f6fed !important;
+        border-bottom: 2px solid #d4e2fb !important;
         border-radius: 0 !important;
-        padding: 6px 2px !important;
+        padding: 8px 2px !important;
         box-shadow: none !important;
+        transition: border-color .2s ease;
       }
-      input:focus, textarea:focus {box-shadow: none !important; border-bottom: 1.5px solid #1f4fd0 !important;}
-      input::placeholder, textarea::placeholder {color:#8bb4f0 !important; font-size: 1.25rem !important;}
+      input:focus, textarea:focus {box-shadow: none !important; border-bottom: 2px solid #2f6fed !important;}
+      input::placeholder, textarea::placeholder {color: #9cc0f5 !important; font-size: 1.35rem !important;}
       div[data-baseweb="input"], div[data-baseweb="textarea"], div[data-baseweb="base-input"] {
         background: transparent !important; border: none !important;
       }
 
-      /* Botoes de OPCAO (multipla escolha) = secondary */
+      /* Botões de OPÇÃO (múltipla escolha) = secondary */
       .stButton button[kind="secondary"] {
         width: 100%;
         text-align: left !important;
         justify-content: flex-start !important;
         background: #ffffff !important;
         color: #2f6fed !important;
-        border: 1.5px solid #cfe0fb !important;
-        border-radius: 8px !important;
-        padding: 12px 16px !important;
-        font-size: 1.05rem !important;
+        border: 1.5px solid #d4e2fb !important;
+        border-radius: 12px !important;
+        padding: 16px 18px !important;
+        font-size: 1.08rem !important;
         font-weight: 500 !important;
-        margin-bottom: 4px;
+        margin-bottom: 10px;
+        box-shadow: 0 2px 6px rgba(47,111,237,0.06);
+        transition: all .16s ease;
       }
       .stButton button[kind="secondary"]:hover {
-        background: #f3f8ff !important; border-color: #2f6fed !important; color:#1f4fd0 !important;
+        background: #f5f9ff !important;
+        border-color: #2f6fed !important;
+        color: #1f4fd0 !important;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 18px rgba(47,111,237,0.16);
       }
 
-      /* Botao CTA principal = primary */
+      /* Botão CTA principal = primary / submit */
       .stButton button[kind="primary"], .stFormSubmitButton button {
-        background: #2f6fed !important;
+        background: linear-gradient(135deg, #2f6fed, #1f4fd0) !important;
         color: #ffffff !important;
         font-weight: 700 !important;
         font-size: 1.05rem !important;
         border: none !important;
-        border-radius: 8px !important;
-        padding: 12px 28px !important;
-        letter-spacing: .3px;
+        border-radius: 10px !important;
+        padding: 13px 30px !important;
+        letter-spacing: .4px;
+        box-shadow: 0 6px 18px rgba(47,111,237,0.28);
+        transition: all .16s ease;
       }
-      .stButton button[kind="primary"]:hover, .stFormSubmitButton button:hover {background:#1f4fd0 !important;}
+      .stButton button[kind="primary"]:hover, .stFormSubmitButton button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 26px rgba(47,111,237,0.36);
+      }
 
-      .bullets {font-size: 1rem; color:#3a4658; line-height: 2;}
-      .obs {font-size: .92rem; color:#9aa3af; font-style: italic; margin: 14px 0 22px;}
-      .capa-titulo {font-size: 1.5rem; color:#243044; line-height:1.4; margin-bottom:18px;}
-      .dica-enter {font-size: .82rem; color:#9aa3af; margin-top:6px;}
+      /* Botão Voltar discreto */
+      .voltar a, .voltar button {color:#9aa3af !important;}
 
-      .espere {text-align:center;}
-      .espere h1 {font-size: 2.4rem; color:#111; font-weight:800; letter-spacing:1px; margin-bottom:0;}
-      .espere .pct {font-size: 2.2rem; color:#f5821f; font-weight:800;}
-      .espere p {font-size: 1.3rem; color:#243044; font-weight:700; margin-top:8px;}
+      /* Barra de progresso fina e azul */
+      .stProgress {margin-bottom: 26px;}
+      .stProgress > div > div > div {background-color: #eef3fb !important; height: 6px !important;}
+      .stProgress > div > div > div > div {background: linear-gradient(90deg,#2f6fed,#5b8df5) !important;}
 
-      /* Placeholder de imagem da capa */
+      .bullets {font-size: 1.02rem; color: #3a4658; line-height: 2.05;}
+      .obs {font-size: .92rem; color: #9aa3af; font-style: italic; margin: 16px 0 24px; line-height:1.5;}
+      .capa-titulo {font-size: 1.5rem; color: #1f2a3a; line-height: 1.42; margin-bottom: 18px;}
+      .dica-enter {font-size: .82rem; color: #b3bac4; margin-top: 8px;}
+
+      .espere {text-align: center; padding-top: 4vh;}
+      .espere h1 {font-size: 2.6rem; color: #0f1115; font-weight: 800; letter-spacing: 1.5px; margin-bottom: 0;}
+      .espere .pct {font-size: 2.3rem; color: #f5821f; font-weight: 800; margin: 4px 0 10px;}
+      .espere p {font-size: 1.3rem; color: #1f2a3a; font-weight: 700; line-height: 1.4;}
+
       .capa-img-ph {
-        width:100%; aspect-ratio: 4/3; border-radius:10px;
+        width: 100%; aspect-ratio: 4/3; border-radius: 14px;
         background: linear-gradient(135deg,#1e3a8a,#2f6fed);
-        display:flex; align-items:center; justify-content:center; color:#cfe0fb; font-size:2.4rem;
+        display: flex; align-items: center; justify-content: center;
+        color: #cfe0fb; font-size: 2.6rem;
+        box-shadow: 0 12px 30px rgba(31,58,138,0.25);
       }
     </style>
     """,
     unsafe_allow_html=True,
 )
+
+# Letras em círculo (badge real, sem precisar de CSS por opção)
+CIRCULADO = {"A": "Ⓐ", "B": "Ⓑ", "C": "Ⓒ", "D": "Ⓓ", "E": "Ⓔ", "F": "Ⓕ", "G": "Ⓖ"}
 
 
 # ------------------------------------------------------------
@@ -131,14 +168,23 @@ def ir(passo: str):
     st.rerun()
 
 
-# Ordem das perguntas (para a barra de progresso)
 ORDEM = ["nome", "whatsapp", "instagram", "faturamento", "investimento"]
+FLUXO_LINEAR = ["capa", "nome", "whatsapp", "instagram", "faturamento", "investimento"]
 
 
 def progresso(passo):
     if passo in ORDEM:
-        return (ORDEM.index(passo)) / (len(ORDEM) + 1)
+        return ORDEM.index(passo) / (len(ORDEM) + 1)
     return None
+
+
+def _anterior(passo):
+    if passo in FLUXO_LINEAR:
+        i = FLUXO_LINEAR.index(passo)
+        return FLUXO_LINEAR[max(0, i - 1)]
+    if passo == "desqualificacao":
+        return "investimento"
+    return "capa"
 
 
 def enviar_lead(qualificado: bool):
@@ -164,7 +210,7 @@ def enviar_lead(qualificado: bool):
 # ------------------------------------------------------------
 # Helpers de UI
 # ------------------------------------------------------------
-def cabecalho_pergunta(passo, titulo, ajuda="Se desejar, adicione uma descrição..."):
+def cabecalho(passo, titulo, ajuda=""):
     p = progresso(passo)
     if p is not None:
         st.progress(p)
@@ -173,8 +219,14 @@ def cabecalho_pergunta(passo, titulo, ajuda="Se desejar, adicione uma descriçã
         st.markdown(f'<div class="ajuda">{ajuda}</div>', unsafe_allow_html=True)
 
 
-def tela_texto(passo, titulo, placeholder, proximo, validar=None, erro="", ajuda="Se desejar, adicione uma descrição...", multiline=False):
-    cabecalho_pergunta(passo, titulo, ajuda)
+def botao_voltar(passo, destino=None):
+    st.write("")
+    if st.button("← Voltar", key=f"v_{passo}"):
+        ir(destino or _anterior(passo))
+
+
+def tela_texto(passo, titulo, placeholder, proximo, validar=None, erro="", ajuda="", multiline=False):
+    cabecalho(passo, titulo, ajuda)
     with st.form(f"f_{passo}"):
         atual = R.get(passo, "")
         if multiline:
@@ -189,31 +241,17 @@ def tela_texto(passo, titulo, placeholder, proximo, validar=None, erro="", ajuda
         else:
             R[passo] = val.strip()
             ir(proximo)
-    if st.button("← Voltar", key=f"v_{passo}"):
-        ir(_anterior(passo))
+    botao_voltar(passo)
 
 
 def tela_opcoes(passo, titulo, opcoes, ao_escolher):
-    """opcoes: lista de (letra, texto). ao_escolher(texto_completo) define o próximo passo."""
-    cabecalho_pergunta(passo, titulo)
+    cabecalho(passo, titulo)
     for letra, texto in opcoes:
-        if st.button(f"{letra}    {texto}", key=f"{passo}_{letra}", type="secondary"):
+        rotulo = f"{CIRCULADO.get(letra, letra)}   {texto}"
+        if st.button(rotulo, key=f"{passo}_{letra}", type="secondary"):
             R[passo] = f"{letra}) {texto}"
             ao_escolher(f"{letra}) {texto}")
-    if st.button("← Voltar", key=f"v_{passo}"):
-        ir(_anterior(passo))
-
-
-FLUXO_LINEAR = ["capa", "nome", "whatsapp", "instagram", "faturamento", "investimento"]
-
-
-def _anterior(passo):
-    if passo in FLUXO_LINEAR:
-        i = FLUXO_LINEAR.index(passo)
-        return FLUXO_LINEAR[max(0, i - 1)]
-    if passo == "desqualificacao":
-        return "investimento"
-    return "capa"
+    botao_voltar(passo)
 
 
 # ============================================================
@@ -221,7 +259,6 @@ def _anterior(passo):
 # ============================================================
 passo = st.session_state.passo
 
-# ---- CAPA ----
 if passo == "capa":
     col_img, col_txt = st.columns([1, 1], gap="large")
     with col_img:
@@ -252,22 +289,18 @@ if passo == "capa":
         if st.button("QUERO + CLIENTES NA CARTEIRA  →", type="primary"):
             ir("nome")
 
-# ---- NOME ----
 elif passo == "nome":
     tela_texto("nome", "Qual seu nome e sobrenome?", "Sua resposta...", "whatsapp",
                validar=nao_vazio, erro="Por favor, informe seu nome.")
 
-# ---- WHATSAPP ----
 elif passo == "whatsapp":
     tela_texto("whatsapp", "Qual seu WhatsApp (com DDD)?", "Um número...", "instagram",
                validar=telefone_valido, erro="Informe um número válido com DDD.")
 
-# ---- INSTAGRAM ----
 elif passo == "instagram":
     tela_texto("instagram", "Qual o @ do instagram da sua distribuidora?", "Sua resposta...", "faturamento",
                validar=nao_vazio, erro="Por favor, informe o @ do Instagram.")
 
-# ---- FATURAMENTO ----
 elif passo == "faturamento":
     opcoes = [
         ("A", "Ainda não estou faturando"),
@@ -281,28 +314,23 @@ elif passo == "faturamento":
     tela_opcoes("faturamento", "Qual o faturamento médio mensal do seu negócio?", opcoes,
                 ao_escolher=lambda _: ir("investimento"))
 
-# ---- INVESTIMENTO (branch) ----
 elif passo == "investimento":
     opcoes = [
         ("A", "Sim! É o que eu preciso e estou disposto!"),
         ("B", "Não estou disposto a investir no meu negócio."),
     ]
 
-    def _escolha_invest(valor):
-        if valor.startswith("B"):
-            ir("desqualificacao")
-        else:
-            ir("final")
+    def _escolha(valor):
+        ir("desqualificacao") if valor.startswith("B") else ir("final")
 
     tela_opcoes(
         "investimento",
         "Nossa mão de obra se inicia em R$ 1.490 por mês. Está disposto a investir esse valor "
         "e elevar seu negócio a um novo patamar de faturamento e vendas?",
         opcoes,
-        ao_escolher=_escolha_invest,
+        ao_escolher=_escolha,
     )
 
-# ---- DESQUALIFICAÇÃO ----
 elif passo == "desqualificacao":
     st.markdown(
         '<div class="pergunta">Para ter acesso aos nossos serviços, '
@@ -321,19 +349,15 @@ elif passo == "desqualificacao":
         ok = st.form_submit_button("Enviar  ✓")
     if ok:
         R["desqualificacao"] = val.strip()
-        # Se reconsiderou (escreveu algo), trata como lead; senão, encerra como não-qualificado
         try:
             enviar_lead(qualificado=bool(val.strip()))
             ir("final")
         except Exception as exc:  # noqa: BLE001
             st.error("Não foi possível enviar agora. Tente novamente.")
             st.caption(f"Detalhe técnico: {exc}")
-    if st.button("← Voltar", key="v_desq"):
-        ir("investimento")
+    botao_voltar("desq", destino="investimento")
 
-# ---- FINAL ----
 elif passo == "final":
-    # Garante o envio do lead qualificado (caso tenha vindo pelo fluxo A)
     if not st.session_state.get("enviado_final") and "desqualificacao" not in R:
         try:
             enviar_lead(qualificado=True)
