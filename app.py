@@ -207,6 +207,18 @@ if "respostas" not in st.session_state:
 
 R = st.session_state.respostas
 
+# ------------------------------------------------------------
+# Rastreio de campanha: captura UTMs + click IDs da URL (uma vez)
+# Ex.: ...streamlit.app/?utm_source=facebook&utm_campaign=distribuidoras&fbclid=ABC
+# ------------------------------------------------------------
+PARAMS_RASTREIO = [
+    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+    "fbclid", "gclid",
+]
+if "rastreio" not in st.session_state:
+    qp = st.query_params
+    st.session_state.rastreio = {k: qp.get(k, "") for k in PARAMS_RASTREIO}
+
 
 def ir(passo: str):
     st.session_state.passo = passo
@@ -244,6 +256,7 @@ def enviar_lead(qualificado: bool):
         "qualificado": qualificado,
         "origem": "streamlit-quiz",
         "capturado_em": datetime.now(timezone.utc).isoformat(),
+        **st.session_state.get("rastreio", {}),
     }
     if not WEBHOOK_URL:
         st.session_state.modo_teste = dados
