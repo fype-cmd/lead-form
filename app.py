@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 import requests
 import streamlit as st
+import streamlit.components.v1 as components
 
 # ============================================================
 # CONFIGURAÇÃO (Secrets do Streamlit Cloud)
@@ -13,6 +14,7 @@ import streamlit as st
 WEBHOOK_URL = st.secrets.get("WEBHOOK_URL", "")
 IMAGEM_CAPA = st.secrets.get("IMAGEM_CAPA", "")
 LINK_AGENDAMENTO = st.secrets.get("LINK_AGENDAMENTO", "")
+META_PIXEL_ID = st.secrets.get("META_PIXEL_ID", "")  # ex.: 123456789012345
 
 st.set_page_config(page_title="Tráfego pago p/ distribuidoras", page_icon="📦", layout="centered")
 
@@ -137,6 +139,49 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ------------------------------------------------------------
+# Meta Pixel — carrega o base + PageView uma única vez (no documento pai)
+# ------------------------------------------------------------
+if META_PIXEL_ID and not st.session_state.get("pixel_base_carregado"):
+    components.html(
+        f"""
+        <script>
+        (function (f, b, e, v) {{
+          if (f.fbq) return;
+          var n = f.fbq = function () {{
+            n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
+          }};
+          if (!f._fbq) f._fbq = n;
+          n.push = n; n.loaded = !0; n.version = '2.0'; n.queue = [];
+          var t = b.createElement(e); t.async = !0; t.src = v;
+          var s = b.getElementsByTagName(e)[0]; s.parentNode.insertBefore(t, s);
+        }})(window.parent, window.parent.document, 'script',
+            'https://connect.facebook.net/en_US/fbevents.js');
+        window.parent.fbq('init', '{META_PIXEL_ID}');
+        window.parent.fbq('track', 'PageView');
+        </script>
+        """,
+        height=0,
+    )
+    st.session_state.pixel_base_carregado = True
+
+
+def disparar_evento_lead():
+    """Dispara fbq('track', 'Lead') no documento pai."""
+    if not META_PIXEL_ID:
+        return
+    components.html(
+        """
+        <script>
+        (function () {
+          if (window.parent.fbq) { window.parent.fbq('track', 'Lead'); }
+        })();
+        </script>
+        """,
+        height=0,
+    )
+
+
 # Letras em círculo (badge real, sem precisar de CSS por opção)
 CIRCULADO = {"A": "Ⓐ", "B": "Ⓑ", "C": "Ⓒ", "D": "Ⓓ", "E": "Ⓔ", "F": "Ⓕ", "G": "Ⓖ"}
 
@@ -210,6 +255,29 @@ def enviar_lead(qualificado: bool):
 # ------------------------------------------------------------
 # Helpers de UI
 # ------------------------------------------------------------
+def autofocus():
+    """Coloca o cursor no primeiro campo da tela (foco automático ao trocar de slide)."""
+    components.html(
+        """
+        <script>
+        (function () {
+          const doc = window.parent.document;
+          let tentativas = 0;
+          const timer = setInterval(function () {
+            tentativas++;
+            const campo = doc.querySelector(
+              'input[type="text"], input:not([type]), input[type="tel"], textarea'
+            );
+            if (campo) { campo.focus(); clearInterval(timer); }
+            if (tentativas > 25) clearInterval(timer);
+          }, 40);
+        })();
+        </script>
+        """,
+        height=0,
+    )
+
+
 def cabecalho(passo, titulo, ajuda=""):
     p = progresso(passo)
     if p is not None:
@@ -235,6 +303,7 @@ def tela_texto(passo, titulo, placeholder, proximo, validar=None, erro="", ajuda
             val = st.text_input(" ", value=atual, placeholder=placeholder, label_visibility="collapsed")
         ok = st.form_submit_button("OK  ✓")
         st.markdown('<div class="dica-enter">pressione <b>Enter ↵</b></div>', unsafe_allow_html=True)
+    autofocus()
     if ok:
         if validar and not validar(val):
             st.error(erro)
@@ -347,6 +416,7 @@ elif passo == "desqualificacao":
     with st.form("f_desq"):
         val = st.text_area(" ", value=R.get("desqualificacao", ""), placeholder="Sua resposta...", label_visibility="collapsed")
         ok = st.form_submit_button("Enviar  ✓")
+    autofocus()
     if ok:
         R["desqualificacao"] = val.strip()
         try:
@@ -377,10 +447,17 @@ elif passo == "final":
     st.write("")
     col = st.columns([1, 2, 1])[1]
     with col:
-        if LINK_AGENDAMENTO:
-            st.link_button("✓ ESTOU PRONTO(A)", LINK_AGENDAMENTO, use_container_width=True)
-        else:
-            if st.button("✓ ESTOU PRONTO(A)", type="primary", use_container_width=True):
+        if st.button("✓ ESTOU PRONTO(A)", type="primary", use_container_width=True):
+            disparar_evento_lead()  # fbq('track', 'Lead')
+            if LINK_AGENDAMENTO:
+                # dá um instante pro pixel disparar e então redireciona ao agendamento
+                components.html(
+                    f"<script>setTimeout(function(){{window.parent.location.href="
+                    f"'{LINK_AGENDAMENTO}';}}, 500);</script>",
+                    height=0,
+                )
+                st.info("Abrindo a agenda…")
+            else:
                 st.success("✅ Recebemos seus dados! Em breve nossa equipe entra em contato.")
 
     if st.session_state.get("modo_teste"):
